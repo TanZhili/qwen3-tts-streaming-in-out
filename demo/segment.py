@@ -29,7 +29,12 @@ def segment_text(text: str) -> list[str]:
     if not raw:
         raise ValueError("demo text is empty")
     if re.search(r"\s", raw):
-        return [part for part in _WS.split(raw) if part]
+        parts = [part for part in _WS.split(raw) if part]
+        # Keep a single trailing space on every unit but the last so the
+        # TTS buffer reads as a normal sentence when the units are appended.
+        if len(parts) <= 1:
+            return parts
+        return [part + " " for part in parts[:-1]] + [parts[-1]]
 
     units: list[str] = []
     buf: list[str] = []
@@ -61,8 +66,8 @@ def _groups_of_two(text: str) -> list[str]:
 
 def self_check() -> None:
     assert segment_text("你好，世界。") == ["你好，", "世界。"]
-    assert segment_text("Hello world") == ["Hello", "world"]
-    assert segment_text("  A   B  ") == ["A", "B"]
+    assert segment_text("Hello world") == ["Hello ", "world"]
+    assert segment_text("  A   B  ") == ["A ", "B"]
     assert segment_text("你好世界") == ["你好", "世界"]
     assert segment_text("你好世") == ["你好", "世"]
     assert segment_text("你") == ["你"]

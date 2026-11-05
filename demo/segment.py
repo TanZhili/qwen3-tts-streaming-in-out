@@ -1,73 +1,62 @@
-"""Split demo text into the units that are fed to TTS once per interval."""
+"""Demo-only stand-in for an LLM text-token stream.
+
+Production code must not call this. A real LLM already emits text tokens;
+pass those strings through unchanged. See ``stream_llm_text_tokens`` in
+``demo/feed.py``.
+
+This machine has no ``tokenizers`` / ``transformers`` install and no
+cached Qwen tokenizer, so the demo does not download one. It walks the
+scripted string as characters and emits groups of at most two characters.
+Whitespace is a character, never a delimiter, and it is never dropped.
+"""
 
 from __future__ import annotations
 
-import re
-
-# Clause boundaries. The character stays with the preceding unit so the
-# spoken fragment still ends on its punctuation.
-_PUNCT = set("，。！？、；：,.!?;:…\n")
-_WS = re.compile(r"\s+")
+DEMO_TOKEN_SOURCE = "char_pairs_2"
+DEMO_CHARS_PER_TOKEN = 2
 
 
-def segment_text(text: str) -> list[str]:
-    """Return ordered feed units.
+def approximate_demo_text_tokens(text: str) -> list[str]:
+    """Approximate one LLM text-token string per 1–2 characters.
 
-    Rule, applied in this order:
-
-    1. If the string contains any whitespace, each whitespace-separated
-       token is one unit (English words, or a bilingual line you already
-       separated with spaces).
-    2. Otherwise split on punctuation into short clauses. The punctuation
-       character stays attached to the clause it closes.
-    3. If that produces a single unit with no punctuation (a Chinese
-       string with no spaces and no punctuation), group it into units of
-       two characters. A trailing leftover character is its own unit.
+    Leading and trailing padding on the scripted sentence is removed.
+    Every remaining character, including spaces and punctuation, stays in
+    the stream. Tokens are groups of ``DEMO_CHARS_PER_TOKEN`` characters,
+    with a final shorter group when the length is odd.
     """
 
     raw = text.strip()
     if not raw:
         raise ValueError("demo text is empty")
-    if re.search(r"\s", raw):
-        parts = [part for part in _WS.split(raw) if part]
-        # Keep a single trailing space on every unit but the last so the
-        # TTS buffer reads as a normal sentence when the units are appended.
-        if len(parts) <= 1:
-            return parts
-        return [part + " " for part in parts[:-1]] + [parts[-1]]
-
-    units: list[str] = []
+    tokens: list[str] = []
     buf: list[str] = []
     for ch in raw:
         buf.append(ch)
-        if ch in _PUNCT:
-            units.append("".join(buf))
+        if len(buf) == DEMO_CHARS_PER_TOKEN:
+            tokens.append("".join(buf))
             buf = []
     if buf:
-        units.append("".join(buf))
-
-    if len(units) == 1 and not any(ch in _PUNCT for ch in units[0]):
-        return _groups_of_two(units[0])
-    return units
-
-
-def _groups_of_two(text: str) -> list[str]:
-    units: list[str] = []
-    buf: list[str] = []
-    for ch in text:
-        buf.append(ch)
-        if len(buf) == 2:
-            units.append("".join(buf))
-            buf = []
-    if buf:
-        units.append("".join(buf))
-    return units
+        tokens.append("".join(buf))
+    return tokens
 
 
 def self_check() -> None:
-    assert segment_text("你好，世界。") == ["你好，", "世界。"]
-    assert segment_text("Hello world") == ["Hello ", "world"]
-    assert segment_text("  A   B  ") == ["A ", "B"]
-    assert segment_text("你好世界") == ["你好", "世界"]
-    assert segment_text("你好世") == ["你好", "世"]
-    assert segment_text("你") == ["你"]
+    assert approximate_demo_text_tokens("你") == ["你"]
+    assert approximate_demo_text_tokens("你好世界") == ["你好", "世界"]
+    assert approximate_demo_text_tokens("你好世") == ["你好", "世"]
+    assert approximate_demo_text_tokens("你好，世界。") == ["你好", "，世", "界。"]
+
+    spaced = approximate_demo_text_tokens("你好 世界")
+    assert "".join(spaced) == "你好 世界"
+    assert spaced == ["你好", " 世", "界"]
+    assert spaced != ["你好", "世界"]
+
+    hello = approximate_demo_text_tokens("Hello world")
+    assert "".join(hello) == "Hello world"
+    assert hello != ["Hello", "world"]
+    assert any(" " in token for token in hello)
+
+    mixed = approximate_demo_text_tokens("你好 Hello")
+    assert "".join(mixed) == "你好 Hello"
+    assert mixed[0] == "你好"
+    assert " " in mixed[1]

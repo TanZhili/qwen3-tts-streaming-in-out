@@ -50,28 +50,33 @@ MLX 只适合 Apple Silicon。TensorRT 引擎和具体 GPU / 驱动绑在一起�
 
 | `--backend` | 行为 |
 | --- | --- |
-| `local`（默认） | 进程内会话。第一个文本单元一到就生成第一包 PCM；之后按 `--decode-step-ms` 继续出包，每一包读取**当时缓冲区里的全部文本**。后到的字留在同一次会话里。波形是 440 Hz 一带的占位正弦，不是语音。 |
+| `local`（默认） | 进程内会话。第一个文本 token 一到就生成第一包 PCM；之后按 `--decode-step-ms` 继续出包，每一包读取**当时缓冲区里的全部文本**。后到的 token 留在同一次会话里。波形是 440 Hz 一带的占位正弦，不是语音。 |
 | `loopback` | 用真实 WebSocket 跑 X-Square 原生帧：`start` / `text` / `stop`，然后 `audio_header` + 二进制 PCM。对端是本进程里的小服务器，收到第一帧文本就回第一包，不等 `stop`。用来核对客户端的发送点和收包点。同样不是模型。 |
 | `xsquare` | 连到已经部署好的引擎，默认 `ws://127.0.0.1:50052/v1/ws`。`ttfa_ms` 是客户端观测值：第一帧 `text` 写出之前的 `perf_counter`，到第一帧二进制 PCM 到达。 |
 | `auto` | 先试 `--url`，连不上就退回 `local`，并打印 `xsquare_unavailable`。 |
 
-接入真实 LLM 的位置是 `demo/feed.py` 里的 `iter_llm_deltas()`。它是一个异步生成器，产出文本增量。默认实现只把演示字符串切成单元，不睡眠。`feed_tts()` 负责送进 TTS：
+接入真实 LLM 时调用 `demo/feed.py` 里的 `stream_llm_text_tokens(session, tokens, trace)`。`tokens` 是异步生成器，**每产出一个 LLM 文本 token 字符串就 yield 一次**。这些字符串是分词器已经吐出的片段，调用方原样送进 `send_text`，不再按词、按句或按空白重切。空格只是 token 内容里可能出现的字符，不是边界。
 
-- 第一个单元立刻送出。这一下就是 `first_text_in`。
-- `--interval-ms` 默认 **240**。从第一次送入的 `perf_counter` 起，第 i 个单元（从 0 数）的送入时刻目标是 `t0 + i * 240ms`。
-- `--interval-ms 0` 时，生成器每产出一段就立刻送入，不再排网格。接真实模型流时用这个，避免再人为拖到 240 ms。
+240 ms 只属于演示里的模拟 LLM。`feed_tts(..., interval_ms=240)` 让第一个模拟 token 立刻送出（这一下就是 `first_text_in`），之后第 i 个（从 0 数）的送入目标时刻是 `t0 + i * 240ms`。真实 token 流走 `stream_llm_text_tokens`，内部间隔是 0：token 一到就送进 TTS。
 
-### 词的切分
+### 模拟 token 从哪来
 
-1. 文本里只要有空白，就按空白切开。一个空白 token 是一个词。除最后一个词以外，送入 TTS 的单元带一个尾随空格，缓冲区拼回去仍是正常句子。`Hello world` → `Hello `、`world`。
-2. 没有空白时，按标点切成短句，标点留在前一个单元上。默认中文演示走这条规则。
-3. 没有空白也没有标点时，每两个字一个单元，最后剩一个字就单独成单元。`你好世界` → `你好`、`世界`。
+本机没有安装 `tokenizers` 或 `transformers`，缓存里也没有 Qwen 分词器，所以没有下载分词器文件。演示用一个写明的近似：`demo_token_source=char_pairs_2`。
+
+规则只用于把一段写死的演示字符串伪装成 token 流：
+
+- 去掉整段开头和结尾的空白。
+- 剩下的每个字符都保留，包括标点和中间的空格。
+- 每 2 个字符组成一个模拟 token，最后剩 1 个字就单独成一个。
+- **不按空白切分。** `你好 世界` 得到 `你好`、` 世`、`界`，空格留在第二个 token 里。`Hello world` 同样按字符两两分组，不会变成 `Hello` 和 `world`。
+
+这条规则**只**给演示用。生产代码应原样转发真实 LLM 文本 token。
 
 默认句子：
 
 `你好，这是流式文本输入。第一包不等全文，后面的词会继续到达。后续音频可以看到更长的上下文。`
 
-切成五段：`你好，` / `这是流式文本输入。` / `第一包不等全文，` / `后面的词会继续到达。` / `后续音频可以看到更长的上下文。`
+开头几个模拟 token 是 `你好`、`，这`、`是流`、`式文`，后面按同一规则继续，直到字符串结束。
 
 ## 时间戳
 
@@ -79,11 +84,11 @@ MLX 只适合 Apple Silicon。TensorRT 引擎和具体 GPU / 驱动绑在一起�
 
 | 日志字段 | 含义 |
 | --- | --- |
-| `llm_first_text_ms` | 模拟 LLM 吐出第一个单元的时刻（调用 `send_text` 之前） |
-| `first_text_in_ms` | 这个单元交给 TTS 的时刻。本地后端是写入会话缓冲的时刻；WebSocket 后端是 `text` 帧发送调用之前 |
+| `llm_first_text_ms` | 模拟 LLM 吐出第一个文本 token 的时刻（调用 `send_text` 之前） |
+| `first_text_in_ms` | 第一个文本 token 交给 TTS 的时刻。本地后端是写入会话缓冲的时刻；WebSocket 后端是 `text` 帧发送调用之前 |
 | `first_audio_out_ms` | 第一包 PCM 已经在内存里的时刻。本地后端是正弦样本生成完；WebSocket 后端是第一帧二进制音频读到的时刻 |
 | `ttfa_ms` | `first_audio_out` 的计数器减去 `first_text_in` 的计数器，单位毫秒 |
-| `word_send gap_ms` | 这一次送入和上一次送入的间隔。第 0 个是 0。其余应落在 240 ms 附近 |
+| `token_send` | 每一个送入 TTS 的文本 token。`index`、`gap_ms`（与上一个 token 的间隔，第 0 个为 0）、`mono_ms`、`token`。演示里除第 0 个外 `gap_ms` 应落在 240 ms 附近 |
 | `later_context extra_text` | 这一包可见文本里，超出第一包当时文本的部分 |
 | `audio_chunk visible_text` | 生成或收到这一包时，会话已经看见的全部文本 |
 
@@ -104,7 +109,7 @@ cd D:\projects\qwen3-tts-streaming-in-out
 python -m demo
 python -m demo --interval-ms 240 --backend local
 python -m demo --backend loopback
-python -m demo --text "Hello streaming audio starts now"
+python -m demo --text "你好 世界"
 ```
 
 成功时最后一行是 `summary ... check=pass`。音频在 `output/`：

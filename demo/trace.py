@@ -47,8 +47,8 @@ class Trace:
     first_audio_bytes: int = 0
     first_audio_samples: int = 0
     text_at_first_audio: str | None = None
-    word_pcs: list[float] = field(default_factory=list)
-    words: list[str] = field(default_factory=list)
+    token_pcs: list[float] = field(default_factory=list)
+    tokens: list[str] = field(default_factory=list)
     chunks: list[ChunkRecord] = field(default_factory=list)
 
     def mark_llm_first(self, text: str) -> None:
@@ -61,7 +61,7 @@ class Trace:
         self.llm_first_text = text
         print(
             f"llm_first_text_ms={self.clock.mono_ms(pc):.3f} "
-            f"wall={wall} text={_q(text)}",
+            f"wall={wall} token={_q(text)}",
             flush=True,
         )
 
@@ -74,10 +74,10 @@ class Trace:
 
         pc = time.perf_counter()
         wall = self.clock.wall_iso()
-        gap_ms = 0.0 if not self.word_pcs else (pc - self.word_pcs[-1]) * 1000.0
-        index = len(self.word_pcs)
-        self.word_pcs.append(pc)
-        self.words.append(text)
+        gap_ms = 0.0 if not self.token_pcs else (pc - self.token_pcs[-1]) * 1000.0
+        index = len(self.token_pcs)
+        self.token_pcs.append(pc)
+        self.tokens.append(text)
         self.buffer += text
         if self.first_text_pc is None:
             self.first_text_pc = pc
@@ -85,12 +85,12 @@ class Trace:
             self.first_text = text
             print(
                 f"first_text_in_ms={self.clock.mono_ms(pc):.3f} "
-                f"wall={wall} text={_q(text)}",
+                f"wall={wall} token={_q(text)}",
                 flush=True,
             )
         print(
-            f"word_send index={index} gap_ms={gap_ms:.3f} "
-            f"mono_ms={self.clock.mono_ms(pc):.3f} text={_q(text)}",
+            f"token_send index={index} gap_ms={gap_ms:.3f} "
+            f"mono_ms={self.clock.mono_ms(pc):.3f} token={_q(text)}",
             flush=True,
         )
         return pc
@@ -153,10 +153,10 @@ class Trace:
             return None
         return (self.first_audio_pc - self.first_text_pc) * 1000.0
 
-    def word_gaps_ms(self) -> list[float]:
+    def token_gaps_ms(self) -> list[float]:
         return [
-            (self.word_pcs[i] - self.word_pcs[i - 1]) * 1000.0
-            for i in range(1, len(self.word_pcs))
+            (self.token_pcs[i] - self.token_pcs[i - 1]) * 1000.0
+            for i in range(1, len(self.token_pcs))
         ]
 
     def to_json(self, *, backend: str, audio_kind: str, interval_ms: float) -> dict[str, Any]:
@@ -182,14 +182,14 @@ class Trace:
             "first_audio_samples": self.first_audio_samples,
             "ttfa_ms": self.ttfa_ms,
             "text_at_first_audio": self.text_at_first_audio,
-            "words": [
+            "tokens": [
                 {
                     "index": i,
-                    "text": word,
+                    "token": token,
                     "mono_ms": self.clock.mono_ms(pc),
-                    "gap_ms": 0.0 if i == 0 else (pc - self.word_pcs[i - 1]) * 1000.0,
+                    "gap_ms": 0.0 if i == 0 else (pc - self.token_pcs[i - 1]) * 1000.0,
                 }
-                for i, (word, pc) in enumerate(zip(self.words, self.word_pcs))
+                for i, (token, pc) in enumerate(zip(self.tokens, self.token_pcs))
             ],
             "chunks": [
                 {

@@ -10,10 +10,10 @@ import wave
 from pathlib import Path
 
 from .clock import Clock
-from .feed import feed_tts, iter_llm_deltas
+from .feed import feed_tts, iter_demo_simulated_tokens
 from .local_backend import LocalStreamingSession
 from .pcm import prepare_out_dir
-from .segment import segment_text, self_check
+from .segment import DEMO_CHARS_PER_TOKEN, DEMO_TOKEN_SOURCE, approximate_demo_text_tokens, self_check
 from .trace import Trace
 from .xsquare_backend import XSquareStreamingSession
 
@@ -45,7 +45,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--interval-ms",
         type=float,
         default=240.0,
-        help="Milliseconds between TTS handoffs after the first unit. Default: 240. Use 0 to forward deltas immediately.",
+        help=(
+            "Demo simulated LLM only: milliseconds between text tokens after the first. "
+            "Default: 240. The first token is sent immediately. "
+            "A real LLM token stream should use 0 so each token is forwarded as soon as it is yielded."
+        ),
     )
     parser.add_argument(
         "--backend",
@@ -167,17 +171,17 @@ def evaluate(trace: Trace, interval_ms: float) -> list[str]:
         return ["first text or first audio was not measured"]
     if trace.ttfa_ms < 0:
         errors.append(f"ttfa_ms is negative ({trace.ttfa_ms:.3f})")
-    gaps = trace.word_gaps_ms()
+    gaps = trace.token_gaps_ms()
     if interval_ms > 0:
         if not gaps:
-            errors.append("need at least two text units to check the feed interval")
+            errors.append("need at least two text tokens to check the feed interval")
         for index, gap in enumerate(gaps, start=1):
             if abs(gap - interval_ms) > 15.0:
                 errors.append(
-                    f"word gap {index} is {gap:.3f} ms, expected {interval_ms:.3f} ± 15"
+                    f"token gap {index} is {gap:.3f} ms, expected {interval_ms:.3f} ± 15"
                 )
-        if len(trace.word_pcs) >= 2 and not (trace.first_audio_pc < trace.word_pcs[1]):
-            errors.append("first audio packet was not ready before the second text unit")
+        if len(trace.token_pcs) >= 2 and not (trace.first_audio_pc < trace.token_pcs[1]):
+            errors.append("first audio packet was not ready before the second text token")
     if not any(chunk.extra_text for chunk in trace.chunks):
         errors.append("no later audio chunk saw text beyond the first packet")
     return errors
@@ -215,7 +219,7 @@ def _check_wavs(trace: Trace, out_dir: Path) -> list[str]:
 
 async def async_main(args: argparse.Namespace) -> int:
     self_check()
-    units = segment_text(args.text)
+    tokens = approximate_demo_text_tokens(args.text)
     if args.interval_ms < 0:
         print("interval-ms must be >= 0", file=sys.stderr)
         return 2
@@ -226,8 +230,14 @@ async def async_main(args: argparse.Namespace) -> int:
     prepare_out_dir(out_dir)
     print(f"clock_origin_wall={clock.origin_wall_iso()}", flush=True)
     print(
-        f"feed_units={len(units)} interval_ms={args.interval_ms:.3f} "
-        f"segmentation={'whitespace' if any(ch.isspace() for ch in args.text) else 'clause'}",
+        f"demo_token_source={DEMO_TOKEN_SOURCE} demo_only=true "
+        f"chars_per_token={DEMO_CHARS_PER_TOKEN} feed_tokens={len(tokens)} "
+        f"interval_ms={args.interval_ms:.3f}",
+        flush=True,
+    )
+    print(
+        "demo_token_note=approximation_for_simulated_llm_only "
+        "production_passes_llm_text_tokens_unchanged",
         flush=True,
     )
 
@@ -241,7 +251,7 @@ async def async_main(args: argparse.Namespace) -> int:
     )
     try:
         feeder = asyncio.create_task(
-            feed_tts(session, iter_llm_deltas(args.text), trace, args.interval_ms),
+            feed_tts(session, iter_demo_simulated_tokens(args.text), trace, args.interval_ms),
             name="llm-feed",
         )
         async for _pcm in session.iter_audio():
@@ -266,11 +276,11 @@ async def async_main(args: argparse.Namespace) -> int:
         encoding="utf-8",
     )
     errors = evaluate(trace, args.interval_ms) + _check_wavs(trace, out_dir)
-    gaps = ",".join(f"{gap:.3f}" for gap in trace.word_gaps_ms())
+    gaps = ",".join(f"{gap:.3f}" for gap in trace.token_gaps_ms())
     before_second = (
-        len(trace.word_pcs) >= 2
+        len(trace.token_pcs) >= 2
         and trace.first_audio_pc is not None
-        and trace.first_audio_pc < trace.word_pcs[1]
+        and trace.first_audio_pc < trace.token_pcs[1]
     )
     extra_chunks = sum(1 for chunk in trace.chunks if chunk.extra_text)
     ttfa_text = "none" if trace.ttfa_ms is None else f"{trace.ttfa_ms:.3f}"
@@ -279,8 +289,8 @@ async def async_main(args: argparse.Namespace) -> int:
         f"backend={backend_name} audio_kind={audio_kind} "
         f"interval_ms={args.interval_ms:.3f} "
         f"ttfa_ms={ttfa_text} "
-        f"word_gaps_ms={gaps or 'none'} "
-        f"first_audio_before_second_word={str(before_second).lower()} "
+        f"token_gaps_ms={gaps or 'none'} "
+        f"first_audio_before_second_token={str(before_second).lower()} "
         f"later_extra_chunks={extra_chunks} "
         f"check={'pass' if not errors else 'fail'}",
         flush=True,

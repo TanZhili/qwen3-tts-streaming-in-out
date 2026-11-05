@@ -1,0 +1,111 @@
+{
+  "backend": "local",
+  "audio_kind": "placeholder_pcm",
+  "interval_ms": 240.0,
+  "clock_origin_wall": "2026-11-05T17:16:43.692+08:00",
+  "llm_first_text_ms": 16.492299735546112,
+  "llm_first_text_wall": "2026-11-05T17:16:43.707+08:00",
+  "first_text_in_ms": 16.557700000703335,
+  "first_text_in_wall": "2026-11-05T17:16:43.708+08:00",
+  "first_text": "你好，",
+  "first_audio_out_ms": 17.381600104272366,
+  "first_audio_out_wall": "2026-11-05T17:16:43.708+08:00",
+  "first_audio_bytes": 3840,
+  "first_audio_samples": 1920,
+  "ttfa_ms": 0.8239001035690308,
+  "text_at_first_audio": "你好，",
+  "words": [
+    {
+      "index": 0,
+      "text": "你好，",
+      "mono_ms": 16.557700000703335,
+      "gap_ms": 0.0
+    },
+    {
+      "index": 1,
+      "text": "这是流式文本输入。",
+      "mono_ms": 256.57059997320175,
+      "gap_ms": 240.01289997249842
+    },
+    {
+      "index": 2,
+      "text": "第一包不等全文，",
+      "mono_ms": 496.5661996975541,
+      "gap_ms": 239.99559972435236
+    },
+    {
+      "index": 3,
+      "text": "后面的词会继续到达。",
+      "mono_ms": 736.5651996806264,
+      "gap_ms": 239.99899998307228
+    },
+    {
+      "index": 4,
+      "text": "后续音频可以看到更长的上下文。",
+      "mono_ms": 976.5665996819735,
+      "gap_ms": 240.00140000134706
+    }
+  ],
+  "chunks": [
+    {
+      "index": 0,
+      "mono_ms": 17.381600104272366,
+      "wall": "2026-11-05T17:16:43.708+08:00",
+      "bytes": 3840,
+      "samples": 1920,
+      "visible_text": "你好，",
+      "extra_text": "",
+      "wav_path": "output\\chunk_000.wav"
+    },
+    {
+      "index": 1,
+      "mono_ms": 220.22160049527884,
+      "wall": "2026-11-05T17:16:43.911+08:00",
+      "bytes": 3840,
+      "samples": 1920,
+      "visible_text": "你好，",
+      "extra_text": "",
+      "wav_path": "output\\chunk_001.wav"
+    },
+    {
+      "index": 2,
+      "mono_ms": 427.1652000024915,
+      "wall": "2026-11-05T17:16:44.118+08:00",
+      "bytes": 3840,
+      "samples": 1920,
+      "visible_text": "你好，这是流式文本输入。",
+      "extra_text": "这是流式文本输入。",
+      "wav_path": "output\\chunk_002.wav"
+    },
+    {
+      "index": 3,
+      "mono_ms": 636.7587996646762,
+      "wall": "2026-11-05T17:16:44.328+08:00",
+      "bytes": 3840,
+      "samples": 1920,
+      "visible_text": "你好，这是流式文本输入。第一包不等全文，",
+      "extra_text": "这是流式文本输入。第一包不等全文，",
+      "wav_path": "output\\chunk_003.wav"
+    },
+    {
+      "index": 4,
+      "mono_ms": 829.283400438726,
+      "wall": "2026-11-05T17:16:44.520+08:00",
+      "bytes": 3840,
+      "samples": 1920,
+      "visible_text": "你好，这是流式文本输入。第一包不等全文，后面的词会继续到达。",
+      "extra_text": "这是流式文本输入。第一包不等全文，后面的词会继续到达。",
+      "wav_path": "output\\chunk_004.wav"
+    },
+    {
+      "index": 5,
+      "mono_ms": 1038.391999900341,
+      "wall": "2026-11-05T17:16:44.729+08:00",
+      "bytes": 3840,
+      "samples": 1920,
+      "visible_text": "你好，这是流式文本输入。第一包不等全文，后面的词会继续到达。后续音频可以看到更长的上下文。",
+      "extra_text": "这是流式文本输入。第一包不等全文，后面的词会继续到达。后续音频可以看到更长的上下文。",
+      "wav_path": "output\\chunk_005.wav"
+    }
+  ]
+}

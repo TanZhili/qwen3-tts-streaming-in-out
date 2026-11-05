@@ -1,0 +1,111 @@
+{
+  "backend": "local",
+  "audio_kind": "placeholder_pcm",
+  "interval_ms": 240.0,
+  "clock_origin_wall": "2026-11-05T17:16:44.052+08:00",
+  "llm_first_text_ms": 1.147400587797165,
+  "llm_first_text_wall": "2026-11-05T17:16:44.053+08:00",
+  "first_text_in_ms": 1.1892998591065407,
+  "first_text_in_wall": "2026-11-05T17:16:44.053+08:00",
+  "first_text": "Hello",
+  "first_audio_out_ms": 1.924700103700161,
+  "first_audio_out_wall": "2026-11-05T17:16:44.054+08:00",
+  "first_audio_bytes": 3840,
+  "first_audio_samples": 1920,
+  "ttfa_ms": 0.7354002445936203,
+  "text_at_first_audio": "Hello",
+  "words": [
+    {
+      "index": 0,
+      "text": "Hello",
+      "mono_ms": 1.1892998591065407,
+      "gap_ms": 0.0
+    },
+    {
+      "index": 1,
+      "text": "streaming",
+      "mono_ms": 241.2024000659585,
+      "gap_ms": 240.01310020685196
+    },
+    {
+      "index": 2,
+      "text": "audio",
+      "mono_ms": 481.1974000185728,
+      "gap_ms": 239.9949999526143
+    },
+    {
+      "index": 3,
+      "text": "starts",
+      "mono_ms": 721.1961001157761,
+      "gap_ms": 239.99870009720325
+    },
+    {
+      "index": 4,
+      "text": "now",
+      "mono_ms": 961.2001003697515,
+      "gap_ms": 240.0040002539754
+    }
+  ],
+  "chunks": [
+    {
+      "index": 0,
+      "mono_ms": 1.924700103700161,
+      "wall": "2026-11-05T17:16:44.054+08:00",
+      "bytes": 3840,
+      "samples": 1920,
+      "visible_text": "Hello",
+      "extra_text": "",
+      "wav_path": "output-en\\chunk_000.wav"
+    },
+    {
+      "index": 1,
+      "mono_ms": 205.1723999902606,
+      "wall": "2026-11-05T17:16:44.256+08:00",
+      "bytes": 3840,
+      "samples": 1920,
+      "visible_text": "Hello",
+      "extra_text": "",
+      "wav_path": "output-en\\chunk_001.wav"
+    },
+    {
+      "index": 2,
+      "mono_ms": 411.13699972629547,
+      "wall": "2026-11-05T17:16:44.462+08:00",
+      "bytes": 3840,
+      "samples": 1920,
+      "visible_text": "Hellostreaming",
+      "extra_text": "streaming",
+      "wav_path": "output-en\\chunk_002.wav"
+    },
+    {
+      "index": 3,
+      "mono_ms": 620.2177004888654,
+      "wall": "2026-11-05T17:16:44.672+08:00",
+      "bytes": 3840,
+      "samples": 1920,
+      "visible_text": "Hellostreamingaudio",
+      "extra_text": "streamingaudio",
+      "wav_path": "output-en\\chunk_003.wav"
+    },
+    {
+      "index": 4,
+      "mono_ms": 812.6181000843644,
+      "wall": "2026-11-05T17:16:44.864+08:00",
+      "bytes": 3840,
+      "samples": 1920,
+      "visible_text": "Hellostreamingaudiostarts",
+      "extra_text": "streamingaudiostarts",
+      "wav_path": "output-en\\chunk_004.wav"
+    },
+    {
+      "index": 5,
+      "mono_ms": 1022.6781005039811,
+      "wall": "2026-11-05T17:16:45.074+08:00",
+      "bytes": 3840,
+      "samples": 1920,
+      "visible_text": "Hellostreamingaudiostartsnow",
+      "extra_text": "streamingaudiostartsnow",
+      "wav_path": "output-en\\chunk_005.wav"
+    }
+  ]
+}

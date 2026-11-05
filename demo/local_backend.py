@@ -67,10 +67,11 @@ class LocalStreamingSession:
         pcm = render_placeholder_pcm(len(self.trace.chunks))
         index = len(self.trace.chunks)
         chunk_path = self.out_dir / f"chunk_{index:03d}.wav"
+        # Stamp once the PCM bytes exist, before they are written to disk.
+        self.trace.mark_audio(pcm, self.sample_rate, visible, str(chunk_path))
         write_wav(chunk_path, pcm, self.sample_rate)
         self._pcm_all.extend(pcm)
         write_wav(self.out_dir / "growing.wav", bytes(self._pcm_all), self.sample_rate)
-        self.trace.mark_audio(pcm, self.sample_rate, visible, str(chunk_path))
         return pcm
 
     async def _decode_loop(self) -> None:

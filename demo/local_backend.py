@@ -1,11 +1,10 @@
 """In-process streaming session with the same text-in contract as the engine.
 
 Text is appended to one buffer. The first PCM packet is built as soon as
-the first unit is appended. Later packets read whatever the buffer holds
-at that moment, so text that arrived after the first packet is visible.
-When the buffer has been fully "covered" and the caller has not closed
-the input, the loop waits (the engine's WAIT_TEXT) instead of freezing
-the first fragment into a separate request.
+the first unit is appended. Later packets are produced on a fixed step
+and each one reads whatever the buffer holds at that moment, so text that
+arrived after the first packet is visible to later packets. The session
+does not drop that text or start a new request.
 
 The waveform is a placeholder tone. It proves the packet exists. It is
 not Qwen3-TTS speech and its ttfa_ms is not a model benchmark.
@@ -18,6 +17,11 @@ from pathlib import Path
 
 from .pcm import SAMPLE_RATE, render_placeholder_pcm, write_wav
 from .trace import Trace
+
+
+def _write_pair(chunk_path: Path, chunk_pcm: bytes, growing_path: Path, growing_pcm: bytes, sample_rate: int) -> None:
+    write_wav(chunk_path, chunk_pcm, sample_rate)
+    write_wav(growing_path, growing_pcm, sample_rate)
 
 
 class LocalStreamingSession:
@@ -63,15 +67,15 @@ class LocalStreamingSession:
         if self._task is not None:
             await self._task
 
-    def _emit(self, visible: str) -> bytes:
+    async def _emit(self, visible: str) -> bytes:
         pcm = render_placeholder_pcm(len(self.trace.chunks))
         index = len(self.trace.chunks)
         chunk_path = self.out_dir / f"chunk_{index:03d}.wav"
         # Stamp once the PCM bytes exist, before they are written to disk.
         self.trace.mark_audio(pcm, self.sample_rate, visible, str(chunk_path))
-        write_wav(chunk_path, pcm, self.sample_rate)
         self._pcm_all.extend(pcm)
-        write_wav(self.out_dir / "growing.wav", bytes(self._pcm_all), self.sample_rate)
+        growing = bytes(self._pcm_all)
+        await asyncio.to_thread(_write_pair, chunk_path, pcm, self.out_dir / "growing.wav", growing, self.sample_rate)
         return pcm
 
     async def _decode_loop(self) -> None:
@@ -81,7 +85,7 @@ class LocalStreamingSession:
             visible = self.trace.buffer
             closed = self._closed
         if visible:
-            pcm = self._emit(visible)
+            pcm = await self._emit(visible)
             await self._queue.put(pcm)
         if closed or not visible:
             await self._queue.put(None)
@@ -92,7 +96,7 @@ class LocalStreamingSession:
             async with self._cond:
                 visible = self.trace.buffer
                 closed = self._closed
-            pcm = self._emit(visible)
+            pcm = await self._emit(visible)
             await self._queue.put(pcm)
             if closed:
                 break
